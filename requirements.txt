@@ -1,0 +1,6 @@
+faster-whisper
+sounddevice
+torch
+anthropic
+fastapi
+uvicorn[standard]

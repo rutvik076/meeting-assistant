@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Setup — Meeting Assistant</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+         background:#0a0a0f;color:#e8e8f0;min-height:100vh;padding-bottom:40px}
+    #bar{padding:14px 16px;font-size:15px;font-weight:500;
+         border-bottom:1px solid #1a1a2e;background:#0a0a0f;
+         position:sticky;top:0;z-index:10;display:flex;
+         align-items:center;justify-content:space-between}
+    #bar a{font-size:13px;color:#7c7c99;text-decoration:none}
+    form{padding:16px}
+    .group{margin-bottom:18px}
+    label{display:block;font-size:12px;color:#7c7c99;
+          margin-bottom:6px;letter-spacing:.04em}
+    .required::after{content:" *";color:#f87171}
+    input,textarea{width:100%;background:#13131a;border:1px solid #252535;
+                   border-radius:10px;padding:12px 14px;color:#e8e8f0;
+                   font-size:14px;font-family:inherit;outline:none;
+                   transition:border-color .2s}
+    input:focus,textarea:focus{border-color:#5b4fcf}
+    textarea{resize:vertical;min-height:80px;line-height:1.5}
+    .hint{font-size:11px;color:#444;margin-top:5px;line-height:1.4}
+    .save-btn{width:100%;padding:15px;background:#5b4fcf;color:#fff;
+              border:none;border-radius:12px;font-size:16px;font-weight:500;
+              cursor:pointer;margin-top:8px;transition:background .2s}
+    .save-btn:hover{background:#4c3db8}
+    .save-btn:active{background:#3d2fa0;transform:scale(.98)}
+    .save-btn:disabled{background:#2a2a3a;color:#555;cursor:not-allowed}
+    #toast{display:none;position:fixed;bottom:30px;left:50%;
+           transform:translateX(-50%);background:#1a3a1a;color:#4ade80;
+           border:1px solid #1e5c1e;padding:12px 24px;border-radius:24px;
+           font-size:14px;font-weight:500;z-index:100;white-space:nowrap}
+    #toast.err{background:#3a1a1a;color:#f87171;border-color:#5c1e1e}
+    .section-title{font-size:11px;font-weight:500;color:#534AB7;
+                   letter-spacing:.08em;text-transform:uppercase;
+                   margin:24px 0 14px;padding-bottom:6px;
+                   border-bottom:1px solid #1a1a2e}
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <span>Your profile</span>
+    <a href="/">Back to assistant</a>
+  </div>
+
+  <form id="profile-form" onsubmit="saveProfile(event)">
+    <div class="section-title">Basic info</div>
+
+    <div class="group">
+      <label class="required" for="name">Full name</label>
+      <input id="name" name="name" type="text" placeholder="e.g. Rutvik Sharma" required>
+    </div>
+
+    <div class="group">
+      <label class="required" for="role">Target role</label>
+      <input id="role" name="role" type="text" placeholder="e.g. Full Stack Developer, Backend Engineer">
+    </div>
+
+    <div class="group">
+      <label for="experience">Years of experience</label>
+      <input id="experience" name="experience" type="text"
+             placeholder="e.g. 2 years in Python and React, 1 year in cloud">
+    </div>
+
+    <div class="section-title">Skills & projects</div>
+
+    <div class="group">
+      <label for="skills">Technical skills</label>
+      <textarea id="skills" name="skills"
+                placeholder="e.g. Python, FastAPI, React, Node.js, PostgreSQL, Docker, AWS"></textarea>
+      <p class="hint">List languages, frameworks, tools — separate with commas</p>
+    </div>
+
+    <div class="group">
+      <label for="projects">Key projects</label>
+      <textarea id="projects" name="projects" style="min-height:100px"
+                placeholder="e.g. Meeting Assistant: Real-time AI that listens to meetings and delivers answers to phone. Built with Whisper, Claude API, FastAPI, WebSocket PWA."></textarea>
+      <p class="hint">Describe 1-3 projects you're proud of. Include tech used and what it does.</p>
+    </div>
+
+    <div class="section-title">Background</div>
+
+    <div class="group">
+      <label for="education">Education</label>
+      <input id="education" name="education" type="text"
+             placeholder="e.g. B.Tech Computer Science, MIT, 2023">
+    </div>
+
+    <div class="group">
+      <label for="goal">Career goal</label>
+      <textarea id="goal" name="goal"
+                placeholder="e.g. Looking for backend roles where I can build intelligent systems and work with AI/ML pipelines at scale."></textarea>
+    </div>
+
+    <div class="group">
+      <label for="extra">Anything else to know</label>
+      <textarea id="extra" name="extra"
+                placeholder="e.g. Open source contributor, speak Hindi + English, interested in distributed systems, available immediately."></textarea>
+      <p class="hint">Strengths, availability, languages spoken, interests — anything useful</p>
+    </div>
+
+    <button type="submit" class="save-btn" id="save-btn">Save profile</button>
+  </form>
+
+  <div id="toast"></div>
+
+  <script>
+    const BASE = window.location.origin;
+
+    // Load existing profile on page open
+    async function loadProfile() {
+      try {
+        const r = await fetch(`${BASE}/api/profile`);
+        const p = await r.json();
+        ['name','role','experience','skills','projects',
+         'education','goal','extra'].forEach(k => {
+          const el = document.getElementById(k);
+          if (el && p[k]) el.value = p[k];
+        });
+      } catch(e) {
+        console.log('No profile yet');
+      }
+    }
+
+    async function saveProfile(e) {
+      e.preventDefault();
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const data = {};
+      ['name','role','experience','skills','projects',
+       'education','goal','extra'].forEach(k => {
+        data[k] = (document.getElementById(k)?.value || '').trim();
+      });
+
+      try {
+        const r = await fetch(`${BASE}/api/profile`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data),
+        });
+        if (r.ok) {
+          showToast('Profile saved! Assistant will now answer as you.', false);
+          setTimeout(() => { window.location.href = '/'; }, 1800);
+        } else {
+          throw new Error('Save failed');
+        }
+      } catch(err) {
+        showToast('Error saving — is the server running?', true);
+        btn.disabled = false;
+        btn.textContent = 'Save profile';
+      }
+    }
+
+    function showToast(msg, isErr) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = isErr ? 'err' : '';
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
